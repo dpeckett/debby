@@ -29,22 +29,14 @@
  * THE SOFTWARE.
  */
 
-package control
+package deb822
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"reflect"
-	"time"
-
-	"github.com/go-viper/mapstructure/v2"
 )
-
-// ControlFieldOrderer is an interface that can be implemented by a struct
-// to define the order of fields in the control file.
-type ControlFieldOrderer interface {
-	ControlFieldOrder() []string
-}
 
 // Marshal is a one-off interface to serialize a single object to a writer.
 //
@@ -54,15 +46,8 @@ type ControlFieldOrderer interface {
 //
 // Given a struct (or list of structs), write to the io.Writer stream
 // in the RFC822-alike Debian control-file format
-//
-// This code will attempt to unpack it into the struct based on the
-// literal name of the key, This can be overridden by the struct tag
-// `control:""`.
 func Marshal(writer io.Writer, data any) error {
-	encoder, err := NewEncoder(writer)
-	if err != nil {
-		return err
-	}
+	encoder := NewEncoder(writer)
 	return encoder.Encode(data)
 }
 
@@ -72,20 +57,13 @@ func Marshal(writer io.Writer, data any) error {
 //
 // It's also worth noting that this *will* also write out elements that
 // were Unmarshaled into a Struct without a member of that name if (and only
-// if) the target Struct contains a `control.Paragraph` anonymous member.
+// if) the target Struct contains a `deb822Paragraph` anonymous member.
 //
 // This is handy if the Unmarshaler was given any `X-*` keys that were not
 // present on your Struct.
 //
 // Given a struct (or list of structs), write to the io.Writer stream
 // in the RFC822-alike Debian control-file format
-//
-// This code will attempt to unpack it into the struct based on the
-// literal name of the key, This can be overridden by the struct tag
-// `control:""`.
-//
-// If you're dehydrating a list of strings, you have the option of defining
-// a string to join the tokens with (`delim:", "`).
 //
 // In order to Marshal a custom Struct, you are required to implement the
 // Marshallable interface. It's highly encouraged to put this interface on
@@ -97,11 +75,11 @@ type Encoder struct {
 }
 
 // Create a new Encoder, which is configured to write to the given `io.Writer`.
-func NewEncoder(writer io.Writer) (*Encoder, error) {
+func NewEncoder(writer io.Writer) *Encoder {
 	return &Encoder{
 		writer:         writer,
 		alreadyWritten: false,
-	}, nil
+	}
 }
 
 // Take a Struct, Encode it into a Paragraph, and write that out to the
@@ -148,52 +126,24 @@ func (e *Encoder) encodeStruct(data reflect.Value) error {
 	}
 	e.alreadyWritten = true
 
-	var order []string
-	if cfo, ok := data.Interface().(ControlFieldOrderer); ok {
-		order = cfo.ControlFieldOrder()
-	}
-
-	_, err = paragraph.WriteTo(e.writer, order)
+	_, err = paragraph.WriteTo(e.writer)
 	return err
 }
 
-func convertToParagraph(data reflect.Value) (Paragraph, error) {
+func convertToParagraph(data reflect.Value) (*Paragraph, error) {
 	if data.Type().Kind() != reflect.Struct {
 		return nil, errors.New("can only Decode a Struct")
 	}
 
-	values := make(map[string]string)
-	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:           &values,
-		WeaklyTypedInput: true,
-		DecodeHook: mapstructure.ComposeDecodeHookFunc(
-			timeToStringHookFunc("Mon, 02 Jan 2006 15:04:05 MST"),
-			mapstructure.TextMarshallerHookFunc(),
-			boolToYesNoHookFunc(),
-			sliceToStringHookFunc(),
-		),
-		TagName: "control",
-	})
+	jsonData, err := json.Marshal(data.Interface())
 	if err != nil {
 		return nil, err
 	}
 
-	if err := decoder.Decode(data.Interface()); err != nil {
+	var paragraph Paragraph
+	if err := json.Unmarshal(jsonData, &paragraph); err != nil {
 		return nil, err
 	}
 
-	return Paragraph(values), nil
-}
-
-func timeToStringHookFunc(layout string) mapstructure.DecodeHookFunc {
-	return func(from, to reflect.Type, data any) (any, error) {
-		if from != reflect.TypeOf(time.Time{}) {
-			return data, nil
-		}
-		if to.Kind() != reflect.String {
-			return data, nil
-		}
-
-		return data.(time.Time).Format(layout), nil
-	}
+	return &paragraph, nil
 }

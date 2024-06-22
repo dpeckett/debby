@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/subtle"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -20,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 
@@ -28,7 +30,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/dpeckett/debby/internal/config"
 	latestconfig "github.com/dpeckett/debby/internal/config/v1alpha1"
-	"github.com/dpeckett/debby/internal/control"
+	"github.com/dpeckett/debby/internal/deb822"
 	"github.com/dpeckett/debby/internal/types"
 	"github.com/dpeckett/debby/internal/util"
 	"github.com/gregjones/httpcache"
@@ -93,13 +95,13 @@ func main() {
 		}, sharedFlags...),
 		Before: initLogger,
 		Action: func(c *cli.Context) error {
-			f, err := os.Open(c.String("config"))
+			confFile, err := os.Open(c.String("config"))
 			if err != nil {
 				return fmt.Errorf("failed to open config file: %w", err)
 			}
-			defer f.Close()
+			defer confFile.Close()
 
-			conf, err := config.FromYAML(f)
+			conf, err := config.FromYAML(confFile)
 			if err != nil {
 				return fmt.Errorf("failed to read config: %w", err)
 			}
@@ -125,6 +127,28 @@ func main() {
 			}
 
 			logger.Info("Available packages", slog.Int("count", len(availablePackages)))
+
+			ids := make([]string, 0, len(availablePackages))
+			for key := range availablePackages {
+				ids = append(ids, key)
+			}
+
+			sort.Strings(ids)
+
+			availablePackageList := make([]types.Package, 0, len(availablePackages))
+			for _, key := range ids {
+				availablePackageList = append(availablePackageList, availablePackages[key])
+			}
+
+			f, err := os.Create("packages.json")
+			if err != nil {
+				return fmt.Errorf("failed to create Packages file: %w", err)
+			}
+			defer f.Close()
+
+			if err := json.NewEncoder(f).Encode(availablePackageList); err != nil {
+				return fmt.Errorf("failed to encode Packages file: %w", err)
+			}
 
 			// TODO: go through the list of user selected packages and check if they are available.
 
@@ -172,14 +196,12 @@ func getAvailablePackages(ctx context.Context, logger *slog.Logger,
 				return fmt.Errorf("failed to parse source URL: %w", err)
 			}
 
-			sourceURL.Path = path.Join(sourceURL.Path, "dists", distribution)
-
 			inReleaseURL, err := url.Parse(sourceURL.String())
 			if err != nil {
 				return fmt.Errorf("failed to parse source URL: %w", err)
 			}
 
-			inReleaseURL.Path = path.Join(inReleaseURL.Path, "InRelease")
+			inReleaseURL.Path = path.Join(inReleaseURL.Path, "dists", distribution, "InRelease")
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, inReleaseURL.String(), nil)
 			if err != nil {
@@ -200,7 +222,7 @@ func getAvailablePackages(ctx context.Context, logger *slog.Logger,
 				return fmt.Errorf("failed to download InRelease file: %s", resp.Status)
 			}
 
-			decoder, err := control.NewDecoder(resp.Body, keyring)
+			decoder, err := deb822.NewDecoder(resp.Body, keyring)
 			if err != nil {
 				return fmt.Errorf("failed to create decoder: %w", err)
 			}
@@ -263,7 +285,7 @@ func getAvailablePackages(ctx context.Context, logger *slog.Logger,
 								return fmt.Errorf("failed to parse source URL: %w", err)
 							}
 
-							packagesURL.Path = path.Join(packagesURL.Path, path.Join(component, "binary-"+arch, "Packages.xz"))
+							packagesURL.Path = path.Join(packagesURL.Path, "dists", distribution, path.Join(component, "binary-"+arch, "Packages.xz"))
 
 							req, err := http.NewRequestWithContext(ctx, http.MethodGet, packagesURL.String(), nil)
 							if err != nil {
@@ -287,7 +309,7 @@ func getAvailablePackages(ctx context.Context, logger *slog.Logger,
 								return fmt.Errorf("failed to create xz reader: %w", err)
 							}
 
-							decoder, err := control.NewDecoder(xzReader, keyring)
+							decoder, err := deb822.NewDecoder(xzReader, keyring)
 							if err != nil {
 								return fmt.Errorf("failed to create decoder: %w", err)
 							}
@@ -322,7 +344,7 @@ func getAvailablePackages(ctx context.Context, logger *slog.Logger,
 										return fmt.Errorf("failed to parse source URL: %w", err)
 									}
 
-									pkgURL.Path = path.Join(pkgURL.Path, path.Base(component), "binary-"+arch, pkg.Filename)
+									pkgURL.Path = path.Join(pkgURL.Path, pkg.Filename)
 
 									pkg := pkg
 									pkg.URL = pkgURL.String()

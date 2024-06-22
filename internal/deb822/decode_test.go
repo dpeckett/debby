@@ -29,36 +29,40 @@
  * THE SOFTWARE.
  */
 
-package control_test
+package deb822_test
 
 import (
 	"testing"
 
-	"github.com/dpeckett/debby/internal/control"
+	"github.com/dpeckett/debby/internal/deb822"
 	"github.com/dpeckett/debby/internal/types/arch"
+	"github.com/dpeckett/debby/internal/types/boolean"
 	"github.com/dpeckett/debby/internal/types/dependency"
+	"github.com/dpeckett/debby/internal/types/list"
 	"github.com/dpeckett/debby/internal/types/version"
 	"github.com/stretchr/testify/require"
 )
 
+type Fnord struct {
+	FooBar string `json:"Fnord-Foo-Bar"`
+}
+
 type TestStruct struct {
-	Value      string
-	ValueTwo   string `control:"Value-Two"`
-	ValueThree []string
-	Depends    dependency.Dependency
-	Version    version.Version
-	Arch       arch.Arch
-	Arches     []arch.Arch
-	Fnord      struct {
-		FooBar string `control:"Fnord-Foo-Bar"`
-	} `control:",squash"`
-	ExtraSourceOnly bool `control:"Extra-Source-Only"`
+	Fnord           `json:",inline"`
+	Value           string
+	ValueTwo        string `json:"Value-Two"`
+	ValueThree      list.SpaceDelimited[string]
+	Depends         dependency.Dependency
+	Version         version.Version
+	Arch            arch.Arch
+	Arches          list.SpaceDelimited[arch.Arch]
+	ExtraSourceOnly boolean.Boolean `json:"Extra-Source-Only"`
 }
 
 func TestBasicUnmarshal(t *testing.T) {
 	foo := TestStruct{}
 
-	require.NoError(t, control.Unmarshal([]byte(`Value: foo
+	require.NoError(t, deb822.Unmarshal([]byte(`Value: foo
 Foo-Bar: baz
 `), &foo))
 	require.Equal(t, "foo", foo.Value)
@@ -66,7 +70,7 @@ Foo-Bar: baz
 
 func TestBasicArrayUnmarshal(t *testing.T) {
 	var foo []TestStruct
-	require.NoError(t, control.Unmarshal([]byte(`Value: foo
+	require.NoError(t, deb822.Unmarshal([]byte(`Value: foo
 Foo-Bar: baz
 
 Value: Bar
@@ -79,7 +83,7 @@ Value: Baz
 
 func TestTagUnmarshal(t *testing.T) {
 	var foo TestStruct
-	require.NoError(t, control.Unmarshal([]byte(`Value: foo
+	require.NoError(t, deb822.Unmarshal([]byte(`Value: foo
 Value-Two: baz
 `), &foo))
 	require.Equal(t, "foo", foo.Value)
@@ -88,7 +92,7 @@ Value-Two: baz
 
 func TestDependsUnmarshal(t *testing.T) {
 	foo := TestStruct{}
-	require.NoError(t, control.Unmarshal([]byte(`Value: foo
+	require.NoError(t, deb822.Unmarshal([]byte(`Value: foo
 Depends: foo, bar
 `), &foo))
 	require.Equal(t, "foo", foo.Value)
@@ -97,12 +101,12 @@ Depends: foo, bar
 	require.Equal(t, "bar", foo.Depends.Relations[1].Possibilities[0].Name)
 
 	// Actually invalid below
-	require.Error(t, control.Unmarshal([]byte(`foo (>= 1.0) (<= 1.0)`), &foo))
+	require.Error(t, deb822.Unmarshal([]byte(`foo (>= 1.0) (<= 1.0)`), &foo))
 }
 
 func TestVersionUnmarshal(t *testing.T) {
 	var foo TestStruct
-	require.NoError(t, control.Unmarshal([]byte(`Value: foo
+	require.NoError(t, deb822.Unmarshal([]byte(`Value: foo
 Version: 1.0-1
 `), &foo))
 	require.Equal(t, "foo", foo.Value)
@@ -111,14 +115,14 @@ Version: 1.0-1
 
 func TestArchUnmarshal(t *testing.T) {
 	foo := TestStruct{}
-	require.NoError(t, control.Unmarshal([]byte(`Value: foo
+	require.NoError(t, deb822.Unmarshal([]byte(`Value: foo
 Arch: amd64
 `), &foo))
 	require.Equal(t, "foo", foo.Value)
 	require.Equal(t, "amd64", foo.Arch.CPU)
 
 	foo = TestStruct{}
-	require.NoError(t, control.Unmarshal([]byte(`Value: foo
+	require.NoError(t, deb822.Unmarshal([]byte(`Value: foo
 Arches: amd64 sparc any
 `), &foo))
 	require.Equal(t, "foo", foo.Value)
@@ -130,7 +134,7 @@ Arches: amd64 sparc any
 
 func TestNestedUnmarshal(t *testing.T) {
 	var foo TestStruct
-	require.NoError(t, control.Unmarshal([]byte(`Value: foo
+	require.NoError(t, deb822.Unmarshal([]byte(`Value: foo
 Fnord-Foo-Bar: Thing
 `), &foo))
 	require.Equal(t, "foo", foo.Value)
@@ -139,8 +143,8 @@ Fnord-Foo-Bar: Thing
 
 func TestListUnmarshal(t *testing.T) {
 	foo := TestStruct{}
-	require.NoError(t, control.Unmarshal([]byte(`Value: foo
-ValueThree: foo, bar, baz
+	require.NoError(t, deb822.Unmarshal([]byte(`Value: foo
+ValueThree: foo bar baz
 `), &foo))
 	require.Equal(t, "foo", foo.Value)
 	require.Len(t, foo.ValueThree, 3)
@@ -149,17 +153,17 @@ ValueThree: foo, bar, baz
 
 func TestBoolUnmarshal(t *testing.T) {
 	var foo TestStruct
-	require.NoError(t, control.Unmarshal([]byte(`Value: foo
+	require.NoError(t, deb822.Unmarshal([]byte(`Value: foo
 `), &foo))
-	require.False(t, foo.ExtraSourceOnly)
+	require.False(t, bool(foo.ExtraSourceOnly))
 
-	require.NoError(t, control.Unmarshal([]byte(`Value: foo
+	require.NoError(t, deb822.Unmarshal([]byte(`Value: foo
 Extra-Source-Only: no
 `), &foo))
-	require.False(t, foo.ExtraSourceOnly)
+	require.False(t, bool(foo.ExtraSourceOnly))
 
-	require.NoError(t, control.Unmarshal([]byte(`Value: foo
+	require.NoError(t, deb822.Unmarshal([]byte(`Value: foo
 Extra-Source-Only: yes
 `), &foo))
-	require.True(t, foo.ExtraSourceOnly)
+	require.True(t, bool(foo.ExtraSourceOnly))
 }

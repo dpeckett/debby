@@ -29,7 +29,7 @@
  * THE SOFTWARE.
  */
 
-package control
+package deb822
 
 import (
 	"bufio"
@@ -96,14 +96,14 @@ func (p *ParagraphReader) All() ([]Paragraph, error) {
 		} else if err != nil {
 			return []Paragraph{}, err
 		}
-		ret = append(ret, paragraph)
+		ret = append(ret, *paragraph)
 	}
 }
 
 // Consume the io.Reader and return the next parsed Paragraph, modulo
 // garbage lines causing us to return an error.
-func (p *ParagraphReader) Next() (Paragraph, error) {
-	paragraph := Paragraph(make(map[string]string))
+func (p *ParagraphReader) Next() (*Paragraph, error) {
+	var paragraph Paragraph
 	var lastKey string
 
 	for {
@@ -115,8 +115,8 @@ func (p *ParagraphReader) Next() (Paragraph, error) {
 		}
 		if err == io.EOF {
 			// Let's return the parsed paragraph if we have it.
-			if len(paragraph) > 0 {
-				return paragraph, nil
+			if len(paragraph.Order) > 0 {
+				return &paragraph, nil
 			}
 			// Else, let's go ahead and drop the EOF out raw.
 			return nil, err
@@ -125,13 +125,13 @@ func (p *ParagraphReader) Next() (Paragraph, error) {
 		}
 
 		if strings.TrimSpace(line) == "" {
-			if len(paragraph) == 0 {
+			if len(paragraph.Order) == 0 {
 				// Skip over any number of blank lines between paragraphs.
 				continue
 			}
 			// Lines are ended by a blank line; so we're able to go ahead
 			// and return this guy as-is. All set. Done. Finished.
-			return paragraph, nil
+			return &paragraph, nil
 		}
 
 		if strings.HasPrefix(line, "#") {
@@ -163,14 +163,13 @@ func (p *ParagraphReader) Next() (Paragraph, error) {
 				line = ""
 			}
 
-			if lastValue, found := paragraph[lastKey]; found {
-				lastValue := lastValue
-				if !strings.HasSuffix(lastValue, "\n") {
-					lastValue = lastValue + "\n"
-				}
-				paragraph[lastKey] = lastValue + line + "\n"
+			if paragraph.Values[lastKey] == "" {
+				paragraph.Values[lastKey] = line + "\n"
 			} else {
-				paragraph[lastKey] = line + "\n"
+				if !strings.HasSuffix(paragraph.Values[lastKey], "\n") {
+					paragraph.Values[lastKey] = paragraph.Values[lastKey] + "\n"
+				}
+				paragraph.Values[lastKey] = paragraph.Values[lastKey] + line + "\n"
 			}
 			continue
 		}
@@ -186,7 +185,7 @@ func (p *ParagraphReader) Next() (Paragraph, error) {
 		lastKey = strings.TrimSpace(els[0])
 		value := strings.TrimSpace(els[1])
 
-		paragraph[lastKey] = value
+		paragraph.Set(lastKey, value)
 	}
 }
 

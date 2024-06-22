@@ -10,13 +10,13 @@
 package types
 
 import (
-	"bytes"
 	"encoding/hex"
-	"time"
+	"strings"
 
-	"github.com/dpeckett/debby/internal/control"
+	"github.com/dpeckett/debby/internal/deb822"
 	"github.com/dpeckett/debby/internal/types/filehash"
 	"github.com/dpeckett/debby/internal/types/list"
+	"github.com/dpeckett/debby/internal/types/time"
 )
 
 // Release represents a Debian release.
@@ -36,52 +36,23 @@ type Release struct {
 	// Date is the date the release was published.
 	Date time.Time
 	// ValidUntil is the date the release is valid until.
-	ValidUntil time.Time `control:"Valid-Until,omitempty"`
+	ValidUntil time.Time `json:"Valid-Until"`
 	// Architectures lists the architectures supported by the release.
-	Architectures []string
+	Architectures list.SpaceDelimited[string]
 	// Components lists the components available in the release.
-	Components []string
+	Components list.SpaceDelimited[string]
 	// Description is a description of the release.
 	Description string
 	// SHA256 lists SHA-256 checksums for files in the release.
 	SHA256 list.NewLineDelimited[filehash.FileHash]
 }
 
-// ControlFieldOrder returns the order of fields in the control file.
-func (r Release) ControlFieldOrder() []string {
-	return []string{
-		"Origin",
-		"Label",
-		"Suite",
-		"Version",
-		"Codename",
-		"Date",
-		"Valid-Until",
-		"Architectures",
-		"Components",
-		"Description",
-		"SHA256",
-	}
-}
-
 func (r Release) String() string {
-	text, err := r.MarshalText()
-	if err != nil {
+	var sb strings.Builder
+	if err := deb822.Marshal(&sb, r); err != nil {
 		panic(err)
 	}
-	return string(text)
-}
-
-func (r Release) MarshalText() ([]byte, error) {
-	var buf bytes.Buffer
-	if err := control.Marshal(&buf, r); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func (r *Release) UnmarshalText(text []byte) error {
-	return control.Unmarshal(text, r)
+	return sb.String()
 }
 
 // SHA256Sums returns a map of SHA-256 checksums for files in the release.

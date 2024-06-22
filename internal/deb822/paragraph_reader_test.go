@@ -29,7 +29,7 @@
  * THE SOFTWARE.
  */
 
-package control_test
+package deb822_test
 
 import (
 	"os"
@@ -37,12 +37,12 @@ import (
 	"testing"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
-	"github.com/dpeckett/debby/internal/control"
+	"github.com/dpeckett/debby/internal/deb822"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBasicParagraphReader(t *testing.T) {
-	reader, err := control.NewParagraphReader(strings.NewReader(`Para: one
+	reader, err := deb822.NewParagraphReader(strings.NewReader(`Para: one
 
 Para: two
 
@@ -57,7 +57,7 @@ Para: three
 }
 
 func TestMultipleNewlines(t *testing.T) {
-	reader, err := control.NewParagraphReader(strings.NewReader(`Para: one
+	reader, err := deb822.NewParagraphReader(strings.NewReader(`Para: one
 
 
 Para: two
@@ -73,7 +73,7 @@ Para: three
 }
 
 func TestWhitespacePrefixedLines(t *testing.T) {
-	reader, err := control.NewParagraphReader(strings.NewReader(`Key1: one
+	reader, err := deb822.NewParagraphReader(strings.NewReader(`Key1: one
 	 continuation
 Key2: two
 	 tabbed continuation
@@ -84,12 +84,12 @@ Key2: two
 	require.NoError(t, err)
 
 	require.Len(t, blocks, 1)
-	require.Equal(t, "one\n continuation\n", blocks[0]["Key1"])
-	require.Equal(t, "two\n tabbed continuation\n", blocks[0]["Key2"])
+	require.Equal(t, "one\n continuation\n", blocks[0].Values["Key1"])
+	require.Equal(t, "two\n tabbed continuation\n", blocks[0].Values["Key2"])
 }
 
 func TestCommentLines(t *testing.T) {
-	reader, err := control.NewParagraphReader(strings.NewReader(`Key1: one
+	reader, err := deb822.NewParagraphReader(strings.NewReader(`Key1: one
 # comment
 Key2: two
  `), nil)
@@ -99,12 +99,12 @@ Key2: two
 	require.NoError(t, err)
 
 	require.Len(t, blocks, 1)
-	require.Equal(t, "one", blocks[0]["Key1"])
-	require.Equal(t, "two", blocks[0]["Key2"])
+	require.Equal(t, "one", blocks[0].Values["Key1"])
+	require.Equal(t, "two", blocks[0].Values["Key2"])
 }
 
 func TestTrailingTwoCharacterNewlines(t *testing.T) {
-	reader, err := control.NewDecoder(strings.NewReader("Key1: one\r\nKey2: two\r\n\r\n"), nil)
+	reader, err := deb822.NewDecoder(strings.NewReader("Key1: one\r\nKey2: two\r\n\r\n"), nil)
 	require.NoError(t, err)
 
 	type TestStruct struct {
@@ -135,7 +135,7 @@ func TestOpenPGPParagraphReader(t *testing.T) {
 	entity, err := openpgp.ReadArmoredKeyRing(pubKeyFile)
 	require.NoError(t, err)
 
-	reader, err := control.NewParagraphReader(f, openpgp.EntityList{entity[0]})
+	reader, err := deb822.NewParagraphReader(f, openpgp.EntityList{entity[0]})
 	require.NoError(t, err)
 
 	blocks, err := reader.All()
@@ -153,6 +153,6 @@ func TestEmptyKeyringOpenPGPParagraphReader(t *testing.T) {
 		require.NoError(t, f.Close())
 	})
 
-	_, err = control.NewParagraphReader(f, keyring)
+	_, err = deb822.NewParagraphReader(f, keyring)
 	require.Error(t, err)
 }

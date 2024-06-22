@@ -29,55 +29,51 @@
  * THE SOFTWARE.
  */
 
-package control
+package deb822_test
 
 import (
-	"fmt"
-	"io"
-	"sort"
 	"strings"
+	"testing"
 
-	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/dpeckett/debby/internal/deb822"
+	"github.com/dpeckett/debby/internal/types/dependency"
+	"github.com/dpeckett/debby/internal/types/version"
+	"github.com/stretchr/testify/require"
 )
 
-// A Paragraph is a block of RFC2822-like key value pairs.
-type Paragraph map[string]string
-
-func (p Paragraph) Set(key, value string) {
-	p[key] = value
+type TestMarshalStruct struct {
+	Foo        string
+	Version    version.Version
+	Dependency dependency.Dependency
 }
 
-func (p Paragraph) WriteTo(w io.Writer, order []string) (total int64, err error) {
-	knownFields := mapset.NewSet(order...)
-
-	var missingFieldNames []string
-	for key := range p {
-		if !knownFields.Contains(key) {
-			missingFieldNames = append(missingFieldNames, key)
-		}
+func TestEncode(t *testing.T) {
+	a := TestMarshalStruct{
+		Foo:        "Hello",
+		Version:    version.MustParse("1.0-1"),
+		Dependency: dependency.MustParse("foo, bar (>= 1.0) [amd64] | baz"),
 	}
 
-	sort.Strings(missingFieldNames)
-
-	orderedFieldNames := make([]string, 0, len(order)+len(missingFieldNames))
-	for _, fieldName := range order {
-		if _, ok := p[fieldName]; ok {
-			orderedFieldNames = append(orderedFieldNames, fieldName)
-		}
-	}
-	orderedFieldNames = append(orderedFieldNames, missingFieldNames...)
-
-	for _, fieldName := range orderedFieldNames {
-		value := p[fieldName]
-		value = strings.Replace(value, "\n", "\n ", -1)
-		value = strings.Replace(value, "\n \n", "\n .\n", -1)
-
-		n, err := w.Write([]byte(fmt.Sprintf("%s: %s\n", fieldName, value)))
-		total += int64(n)
-		if err != nil {
-			return total, err
-		}
+	b := TestMarshalStruct{
+		Foo:        "World",
+		Version:    version.MustParse("1.0-1"),
+		Dependency: dependency.MustParse("foo, bar (>= 2.0) [amd64] | baz"),
 	}
 
-	return
+	var sb strings.Builder
+	encoder := deb822.NewEncoder(&sb)
+
+	require.NoError(t, encoder.Encode(a))
+	require.NoError(t, encoder.Encode(b))
+
+	expected := `Foo: Hello
+Version: 1.0-1
+Dependency: foo, bar [amd64] (>= 1.0) | baz
+
+Foo: World
+Version: 1.0-1
+Dependency: foo, bar [amd64] (>= 2.0) | baz
+`
+
+	require.Equal(t, expected, sb.String())
 }

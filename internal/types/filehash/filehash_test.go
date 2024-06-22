@@ -13,7 +13,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dpeckett/debby/internal/control"
+	"github.com/dpeckett/debby/internal/deb822"
 	"github.com/dpeckett/debby/internal/types/filehash"
 	"github.com/dpeckett/debby/internal/types/list"
 	"github.com/stretchr/testify/require"
@@ -26,7 +26,7 @@ func TestFileHash(t *testing.T) {
 		require.NoError(t, f.Close())
 	})
 
-	decoder, err := control.NewDecoder(f, nil)
+	decoder, err := deb822.NewDecoder(f, nil)
 	require.NoError(t, err)
 
 	type TestStruct struct {

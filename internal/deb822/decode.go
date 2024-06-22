@@ -29,17 +29,17 @@
  * THE SOFTWARE.
  */
 
-package control
+package deb822
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"reflect"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
-	"github.com/go-viper/mapstructure/v2"
 )
 
 func Unmarshal(data []byte, v any) error {
@@ -78,7 +78,7 @@ func (d *Decoder) Decode(v any) error {
 		if err != nil {
 			return err
 		}
-		return decodeStruct(paragraph, into)
+		return decodeStruct(*paragraph, into)
 	case reflect.Slice:
 		return d.decodeSlice(into)
 	default:
@@ -100,7 +100,7 @@ func (d *Decoder) decodeSlice(into reflect.Value) error {
 			return err
 		}
 
-		if err := decodeStruct(paragraph, targetValue); err != nil {
+		if err := decodeStruct(*paragraph, targetValue); err != nil {
 			return err
 		}
 		into.Elem().Set(reflect.Append(into.Elem(), targetValue.Elem()))
@@ -114,20 +114,16 @@ func decodeStruct(paragraph Paragraph, into reflect.Value) error {
 		return decodeStruct(paragraph, into.Elem())
 	}
 
-	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:           into.Addr().Interface(),
-		WeaklyTypedInput: true,
-		DecodeHook: mapstructure.ComposeDecodeHookFunc(
-			mapstructure.StringToTimeHookFunc("Mon, 02 Jan 2006 15:04:05 MST"),
-			yesNoToBoolHookFunc(),
-			mapstructure.TextUnmarshallerHookFunc(),
-			stringToSliceHookFunc(),
-		),
-		TagName: "control",
-	})
+	// Marshal the Paragraph
+	jsonData, err := json.Marshal(paragraph)
 	if err != nil {
 		return err
 	}
 
-	return decoder.Decode(paragraph)
+	// Unmarshal the JSON into the struct
+	if err := json.Unmarshal(jsonData, into.Addr().Interface()); err != nil {
+		return err
+	}
+
+	return nil
 }

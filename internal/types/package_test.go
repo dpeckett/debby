@@ -14,7 +14,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dpeckett/debby/internal/control"
+	"github.com/dpeckett/debby/internal/deb822"
 	"github.com/dpeckett/debby/internal/types"
 	"github.com/dpeckett/debby/internal/types/arch"
 	"github.com/dpeckett/debby/internal/types/dependency"
@@ -29,7 +29,7 @@ func TestPackage(t *testing.T) {
 		require.NoError(t, f.Close())
 	})
 
-	decoder, err := control.NewDecoder(f, nil)
+	decoder, err := deb822.NewDecoder(f, nil)
 	require.NoError(t, err)
 
 	var packages []types.Package
