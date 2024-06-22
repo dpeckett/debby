@@ -66,6 +66,38 @@ type Package struct {
 	Size int `control:",omitempty"`
 	// SHA256 is the SHA-256 checksum of the package file.
 	SHA256 string `control:",omitempty"`
+	// Additional fields that are not part of the control file.
+	// The full URL to the package file.
+	URL string `control:"-"`
+}
+
+// ControlFieldOrder returns the order of fields in the control file.
+func (p Package) ControlFieldOrder() []string {
+	return []string{
+		"Package",
+		"Source",
+		"Version",
+		"Installed-Size",
+		"Maintainer",
+		"Architecture",
+		"Replaces",
+		"Breaks",
+		"Provides",
+		"Conflicts",
+		"Enhances",
+		"Depends",
+		"Recommends",
+		"Suggests",
+		"Pre-Depends",
+		"Description",
+		"Homepage",
+		"Tag",
+		"Section",
+		"Priority",
+		"Filename",
+		"Size",
+		"SHA256",
+	}
 }
 
 func (p Package) String() string {
@@ -86,4 +118,9 @@ func (p Package) MarshalText() ([]byte, error) {
 
 func (p *Package) UnmarshalText(text []byte) error {
 	return control.Unmarshal(text, p)
+}
+
+// ID returns a unique identifier for the package.
+func (p Package) ID() string {
+	return p.Package + "_" + p.Version.String() + "_" + p.Architecture.String()
 }

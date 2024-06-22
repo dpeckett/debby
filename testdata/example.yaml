@@ -6,8 +6,6 @@ contents:
       distribution: bookworm
       components:
         - main
-        - contrib
-        - non-free
     - url: http://security.debian.org/debian-security
       distribution: bookworm-security
       components:

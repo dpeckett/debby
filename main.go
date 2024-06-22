@@ -13,7 +13,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/subtle"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -141,16 +140,11 @@ func main() {
 	}
 }
 
-type packageWithSourceURL struct {
-	types.Package
-	sourceURL string
-}
-
 func getAvailablePackages(ctx context.Context, logger *slog.Logger,
 	httpClient *http.Client, keyring openpgp.EntityList,
-	conf *latestconfig.Config, arch string) (map[string][]packageWithSourceURL, error) {
+	conf *latestconfig.Config, arch string) (map[string]types.Package, error) {
 	var availablePackagesMu sync.Mutex
-	availablePackages := map[string][]packageWithSourceURL{}
+	var availablePackages = make(map[string]types.Package)
 
 	sem := semaphore.NewWeighted(int64(maxConcurrentRequests))
 	g, ctx := errgroup.WithContext(ctx)
@@ -269,8 +263,7 @@ func getAvailablePackages(ctx context.Context, logger *slog.Logger,
 								return fmt.Errorf("failed to parse source URL: %w", err)
 							}
 
-							relativePackagesPath := path.Join(component, "binary-"+arch, "Packages.xz")
-							packagesURL.Path = path.Join(packagesURL.Path, relativePackagesPath)
+							packagesURL.Path = path.Join(packagesURL.Path, path.Join(component, "binary-"+arch, "Packages.xz"))
 
 							req, err := http.NewRequestWithContext(ctx, http.MethodGet, packagesURL.String(), nil)
 							if err != nil {
@@ -304,14 +297,14 @@ func getAvailablePackages(ctx context.Context, logger *slog.Logger,
 								return fmt.Errorf("failed to decode Packages file: %w", err)
 							}
 
-							// TODO: what is the correct logic here with slashes in component names?
-							expectedSHA256Sum, ok := releaseSHA256Sums[strings.TrimPrefix(relativePackagesPath, "updates/")]
+							relativePackagesPath := path.Join(path.Base(component), "binary-"+arch, "Packages.xz")
+							expectedSHA256Sum, ok := releaseSHA256Sums[relativePackagesPath]
 							if !ok {
-								return fmt.Errorf("no SHA256 sum for %s", relativePackagesPath)
+								return fmt.Errorf("no SHA256 sum for Packages file: %s", relativePackagesPath)
 							}
 
 							if subtle.ConstantTimeCompare(expectedSHA256Sum, hr.Sum()) != 1 {
-								return errors.New("checksum mismatch for Packages file")
+								return fmt.Errorf("checksum mismatch for Packages file: %s", relativePackagesPath)
 							}
 
 							logger.Debug("Package list checksum verified", slog.String("url", packagesURL.String()))
@@ -319,13 +312,24 @@ func getAvailablePackages(ctx context.Context, logger *slog.Logger,
 							logger.Debug("Found packages in package list", slog.Int("count", len(packages)))
 
 							availablePackagesMu.Lock()
+							defer availablePackagesMu.Unlock()
+
 							for _, pkg := range packages {
-								availablePackages[pkg.Package] = append(availablePackages[pkg.Package], packageWithSourceURL{
-									Package:   pkg,
-									sourceURL: source.URL,
-								})
+								id := pkg.ID()
+								if _, exist := availablePackages[id]; !exist {
+									pkgURL, err := url.Parse(sourceURL.String())
+									if err != nil {
+										return fmt.Errorf("failed to parse source URL: %w", err)
+									}
+
+									pkgURL.Path = path.Join(pkgURL.Path, path.Base(component), "binary-"+arch, pkg.Filename)
+
+									pkg := pkg
+									pkg.URL = pkgURL.String()
+
+									availablePackages[id] = pkg
+								}
 							}
-							availablePackagesMu.Unlock()
 
 							return nil
 						})

@@ -47,17 +47,21 @@ type Release struct {
 	SHA256 list.NewLineDelimited[filehash.FileHash]
 }
 
-// SHA256Sums returns a map of SHA-256 checksums for files in the release.
-func (r *Release) SHA256Sums() (map[string][]byte, error) {
-	ret := make(map[string][]byte)
-	for _, hash := range r.SHA256 {
-		var err error
-		ret[hash.Filename], err = hex.DecodeString(hash.Hash)
-		if err != nil {
-			return nil, err
-		}
+// ControlFieldOrder returns the order of fields in the control file.
+func (r Release) ControlFieldOrder() []string {
+	return []string{
+		"Origin",
+		"Label",
+		"Suite",
+		"Version",
+		"Codename",
+		"Date",
+		"Valid-Until",
+		"Architectures",
+		"Components",
+		"Description",
+		"SHA256",
 	}
-	return ret, nil
 }
 
 func (r Release) String() string {
@@ -78,4 +82,17 @@ func (r Release) MarshalText() ([]byte, error) {
 
 func (r *Release) UnmarshalText(text []byte) error {
 	return control.Unmarshal(text, r)
+}
+
+// SHA256Sums returns a map of SHA-256 checksums for files in the release.
+func (r *Release) SHA256Sums() (map[string][]byte, error) {
+	ret := make(map[string][]byte)
+	for _, hash := range r.SHA256 {
+		var err error
+		ret[hash.Filename], err = hex.DecodeString(hash.Hash)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ret, nil
 }

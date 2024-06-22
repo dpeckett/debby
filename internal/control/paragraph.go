@@ -36,6 +36,8 @@ import (
 	"io"
 	"sort"
 	"strings"
+
+	mapset "github.com/deckarep/golang-set/v2"
 )
 
 // A Paragraph is a block of RFC2822-like key value pairs.
@@ -45,20 +47,32 @@ func (p Paragraph) Set(key, value string) {
 	p[key] = value
 }
 
-func (p Paragraph) WriteTo(out io.Writer) (total int64, err error) {
-	keys := make([]string, 0, len(p))
+func (p Paragraph) WriteTo(w io.Writer, order []string) (total int64, err error) {
+	knownFields := mapset.NewSet(order...)
+
+	var missingFieldNames []string
 	for key := range p {
-		keys = append(keys, key)
+		if !knownFields.Contains(key) {
+			missingFieldNames = append(missingFieldNames, key)
+		}
 	}
 
-	sort.Strings(keys)
+	sort.Strings(missingFieldNames)
 
-	for _, key := range keys {
-		value := p[key]
+	orderedFieldNames := make([]string, 0, len(order)+len(missingFieldNames))
+	for _, fieldName := range order {
+		if _, ok := p[fieldName]; ok {
+			orderedFieldNames = append(orderedFieldNames, fieldName)
+		}
+	}
+	orderedFieldNames = append(orderedFieldNames, missingFieldNames...)
+
+	for _, fieldName := range orderedFieldNames {
+		value := p[fieldName]
 		value = strings.Replace(value, "\n", "\n ", -1)
 		value = strings.Replace(value, "\n \n", "\n .\n", -1)
 
-		n, err := out.Write([]byte(fmt.Sprintf("%s: %s\n", key, value)))
+		n, err := w.Write([]byte(fmt.Sprintf("%s: %s\n", fieldName, value)))
 		total += int64(n)
 		if err != nil {
 			return total, err

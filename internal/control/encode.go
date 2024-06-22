@@ -40,6 +40,12 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 )
 
+// ControlFieldOrderer is an interface that can be implemented by a struct
+// to define the order of fields in the control file.
+type ControlFieldOrderer interface {
+	ControlFieldOrder() []string
+}
+
 // Marshal is a one-off interface to serialize a single object to a writer.
 //
 // Most notably, this will *not* separate Paragraphs with a newline as is
@@ -135,12 +141,19 @@ func (e *Encoder) encodeStruct(data reflect.Value) error {
 			return err
 		}
 	}
+
 	paragraph, err := convertToParagraph(data)
 	if err != nil {
 		return err
 	}
 	e.alreadyWritten = true
-	_, err = paragraph.WriteTo(e.writer)
+
+	var order []string
+	if cfo, ok := data.Interface().(ControlFieldOrderer); ok {
+		order = cfo.ControlFieldOrder()
+	}
+
+	_, err = paragraph.WriteTo(e.writer, order)
 	return err
 }
 
