@@ -10,7 +10,9 @@
 package util
 
 import (
+	"crypto/hmac"
 	"crypto/sha256"
+	"errors"
 	"hash"
 	"io"
 )
@@ -35,7 +37,11 @@ func (hr *HashReader) Read(p []byte) (int, error) {
 	return hr.reader.Read(p)
 }
 
-// Sum returns the SHA-256 checksum of the read data.
-func (hr *HashReader) Sum() []byte {
-	return hr.hasher.Sum(nil)
+// Verify returns true if the calculated hash matches the expected hash.
+func (hr *HashReader) Verify(expected []byte) error {
+	if !hmac.Equal(hr.hasher.Sum(nil), expected) {
+		return errors.New("hash mismatch")
+	}
+
+	return nil
 }

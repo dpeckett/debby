@@ -59,29 +59,29 @@ func TestVersion(t *testing.T) {
 			a, err := version.Parse("0")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 
 			a, err = version.Parse("0:0")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 
 			a, err = version.Parse("0:0-")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 
 			b = v(0, "0", "0")
 			a, err = version.Parse("0:0-0")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 
 			b = v(0, "0.0", "0.0")
 			a, err = version.Parse("0:0.0-0.0")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 		})
 
 		t.Run("Epoched", func(t *testing.T) {
@@ -90,13 +90,13 @@ func TestVersion(t *testing.T) {
 			a, err := version.Parse("1:0")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 
 			b = v(5, "1", "")
 			a, err = version.Parse("5:1")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 		})
 
 		t.Run("MultipleHyphens", func(t *testing.T) {
@@ -105,13 +105,13 @@ func TestVersion(t *testing.T) {
 			a, err := version.Parse("0:0-0-0")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 
 			b = v(0, "0-0-0", "0")
 			a, err = version.Parse("0:0-0-0-0")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 		})
 
 		t.Run("MultipleColons", func(t *testing.T) {
@@ -120,13 +120,13 @@ func TestVersion(t *testing.T) {
 			a, err := version.Parse("0:0:0-0")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 
 			b = v(0, "0:0:0", "0")
 			a, err = version.Parse("0:0:0:0-0")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 		})
 
 		t.Run("MultipleHyphensAndColons", func(t *testing.T) {
@@ -135,13 +135,13 @@ func TestVersion(t *testing.T) {
 			a, err := version.Parse("0:0:0-0-0")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 
 			b = v(0, "0-0:0", "0")
 			a, err = version.Parse("0:0-0:0-0")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 		})
 
 		t.Run("ValidUpstreamVersionCharacters", func(t *testing.T) {
@@ -150,7 +150,7 @@ func TestVersion(t *testing.T) {
 			a, err := version.Parse("0:09azAZ.-+~:-0")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 		})
 
 		t.Run("ValidRevisionCharacters", func(t *testing.T) {
@@ -159,7 +159,7 @@ func TestVersion(t *testing.T) {
 			a, err := version.Parse("0:0-09azAZ.+~")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 		})
 
 		t.Run("LeadingTrailingSpaces", func(t *testing.T) {
@@ -168,17 +168,17 @@ func TestVersion(t *testing.T) {
 			a, err := version.Parse("    0:0-1")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 
 			a, err = version.Parse("0:0-1     ")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 
 			a, err = version.Parse("      0:0-1     ")
 			require.NoError(t, err)
 
-			require.Zero(t, version.Compare(a, b))
+			require.Zero(t, a.Compare(b))
 		})
 
 		t.Run("EmptyVersion", func(t *testing.T) {
@@ -246,44 +246,44 @@ func TestVersion(t *testing.T) {
 		t.Run("Compare", func(t *testing.T) {
 			t.Run("Equal", func(t *testing.T) {
 				a, b := v(0, "0", "0"), v(0, "0", "0")
-				require.Zero(t, version.Compare(a, b))
+				require.Zero(t, a.Compare(b))
 
 				a, b = v(0, "0", "00"), v(0, "00", "0")
-				require.Zero(t, version.Compare(a, b))
+				require.Zero(t, a.Compare(b))
 
 				a, b = v(1, "2", "3"), v(1, "2", "3")
-				require.Zero(t, version.Compare(a, b))
+				require.Zero(t, a.Compare(b))
 			})
 
 			t.Run("Epoch", func(t *testing.T) {
-				require.NotZero(t, version.Compare(version.Version{Epoch: 1}, version.Version{Epoch: 2}))
+				require.NotZero(t, (version.Version{Epoch: 1}).Compare(version.Version{Epoch: 2}))
 
 				a, b := v(0, "1", "1"), v(0, "2", "1")
-				require.NotZero(t, version.Compare(a, b))
+				require.NotZero(t, a.Compare(b))
 
 				a, b = v(0, "1", "1"), v(0, "1", "2")
-				require.NotZero(t, version.Compare(a, b))
+				require.NotZero(t, a.Compare(b))
 
 				a, b = v(0, "0", "0"), v(1, "0", "0")
-				require.Less(t, version.Compare(a, b), 0)
-				require.Greater(t, version.Compare(b, a), 0)
+				require.Less(t, a.Compare(b), 0)
+				require.Greater(t, b.Compare(a), 0)
 			})
 
 			t.Run("Version", func(t *testing.T) {
 				a, b := v(0, "a", "0"), v(0, "b", "0")
-				require.Less(t, version.Compare(a, b), 0)
-				require.Greater(t, version.Compare(b, a), 0)
+				require.Less(t, a.Compare(b), 0)
+				require.Greater(t, b.Compare(a), 0)
 			})
 
 			t.Run("Revision", func(t *testing.T) {
 				a, b := v(0, "0", "a"), v(0, "0", "b")
-				require.Less(t, version.Compare(a, b), 0)
-				require.Greater(t, version.Compare(b, a), 0)
+				require.Less(t, a.Compare(b), 0)
+				require.Greater(t, b.Compare(a), 0)
 			})
 
 			t.Run("CodeSearch", func(t *testing.T) {
 				a, b := v(0, "1.8.6", "2"), v(0, "1.8.6", "2.1")
-				require.Less(t, version.Compare(a, b), 0)
+				require.Less(t, a.Compare(b), 0)
 			})
 		})
 

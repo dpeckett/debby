@@ -35,6 +35,5 @@ func TestHashReader(t *testing.T) {
 	require.Equal(t, data, readData)
 
 	// Verify the checksum
-	computedHash := hashReader.Sum()
-	require.Equal(t, expectedHash, computedHash)
+	require.NoError(t, hashReader.Verify(expectedHash))
 }

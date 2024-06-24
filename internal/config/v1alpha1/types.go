@@ -26,8 +26,6 @@ type Config struct {
 type ContentsConfig struct {
 	// Sources is a list of apt repositories to use for downloading packages.
 	Sources []SourceConfig `yaml:"sources"`
-	// Keyring is a list of public key URLs or files to use for verifying packages.
-	Keyring []string `yaml:"keyring,omitempty"`
 	// Packages is a list of packages to install.
 	Packages []string `yaml:"packages"`
 }
@@ -36,6 +34,8 @@ type ContentsConfig struct {
 type SourceConfig struct {
 	// URL is the URL of the repository.
 	URL string `yaml:"url"`
+	// Signed by is a public key URL (https) or file path to use for verifying the repository.
+	SignedBy string `yaml:"signedBy"`
 	// Distribution specifies the Debian distribution name (e.g., bullseye, buster)
 	// or class (e.g., stable, testing). If not specified, defaults to "stable".
 	Distribution string `yaml:"distribution,omitempty"`

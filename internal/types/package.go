@@ -12,7 +12,6 @@ package types
 import (
 	"strings"
 
-	"github.com/dpeckett/debby/internal/deb822"
 	"github.com/dpeckett/debby/internal/types/arch"
 	"github.com/dpeckett/debby/internal/types/dependency"
 	"github.com/dpeckett/debby/internal/types/list"
@@ -71,19 +70,33 @@ type Package struct {
 	// Additional fields that are not part of the standard control file but are
 	// used internally by debby.
 
-	// The full URL to the package file.
-	URL string
-}
-
-func (p Package) String() string {
-	var sb strings.Builder
-	if err := deb822.Marshal(&sb, p); err != nil {
-		panic(err)
-	}
-	return sb.String()
+	// URLs is a list of URLs that the package can be downloaded from.
+	URLs []string `json:"X-URLs"`
 }
 
 // ID returns a unique identifier for the package.
 func (p Package) ID() string {
 	return p.Package + "_" + p.Version.String() + "_" + p.Architecture.String()
+}
+
+func (a Package) Compare(b Package) int {
+	// Compare package names.
+	if cmp := strings.Compare(a.Package, b.Package); cmp != 0 {
+		return cmp
+	}
+
+	// Compare package versions.
+	if cmp := a.Version.Compare(b.Version); cmp != 0 {
+		return cmp
+	}
+
+	// Compare architectures.
+	if a.Architecture.Is(&b.Architecture) || b.Architecture.Is(&a.Architecture) {
+		return 0
+	}
+	if cmp := strings.Compare(a.Architecture.String(), b.Architecture.String()); cmp != 0 {
+		return cmp
+	}
+
+	return 0
 }

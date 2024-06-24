@@ -3,15 +3,14 @@ kind: Config
 contents:
   sources:
     - url: https://deb.debian.org/debian
+      signedBy: https://ftp-master.debian.org/keys/archive-key-12.asc
       distribution: bookworm
       components:
         - main
-    - url: http://security.debian.org/debian-security
+    - url: https://security.debian.org/debian-security
+      signedBy: https://ftp-master.debian.org/keys/archive-key-12-security.asc
       distribution: bookworm-security
       components:
         - updates/main
-  keyring:
-    - https://ftp-master.debian.org/keys/archive-key-12.asc
-    - https://ftp-master.debian.org/keys/archive-key-12-security.asc
   packages:
     - libc6

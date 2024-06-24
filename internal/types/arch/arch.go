@@ -98,22 +98,22 @@ func (arch *Arch) UnmarshalText(text []byte) error {
 }
 
 // Parse an architecture string into an Arch struct.
-func Parse(arch string) (*Arch, error) {
-	ret := &Arch{
+func Parse(arch string) (Arch, error) {
+	result := Arch{
 		ABI: "any",
 		OS:  "any",
 		CPU: "any",
 	}
-	return ret, parseArchInto(ret, arch)
+	return result, parseArchInto(&result, arch)
 }
 
 // MustParse is like Parse, but panics on error.
 func MustParse(arch string) Arch {
-	ret, err := Parse(arch)
+	result, err := Parse(arch)
 	if err != nil {
 		panic(err)
 	}
-	return *ret
+	return result
 }
 
 func parseArchInto(ret *Arch, arch string) error {

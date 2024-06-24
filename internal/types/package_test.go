@@ -10,7 +10,6 @@
 package types_test
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
@@ -55,7 +54,5 @@ func TestPackage(t *testing.T) {
 		SHA256:        "3a2118df47bf3f04285649f0455c2fc6fe2dc7f0b237073038aa00af41f0d5f2",
 	}
 
-	fmt.Println(packages[0].String())
-
-	require.Equal(t, expected.String(), packages[0].String())
+	require.Equal(t, expected, packages[0])
 }

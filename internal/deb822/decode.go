@@ -65,6 +65,11 @@ func NewDecoder(reader io.Reader, keyring openpgp.EntityList) (*Decoder, error) 
 	return &ret, nil
 }
 
+// Return the Entity (if one exists) that signed this set of Paragraphs.
+func (d *Decoder) Signer() *openpgp.Entity {
+	return d.paragraphReader.Signer()
+}
+
 func (d *Decoder) Decode(v any) error {
 	into := reflect.ValueOf(v)
 

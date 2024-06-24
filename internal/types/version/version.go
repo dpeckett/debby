@@ -92,28 +92,90 @@ func (v Version) String() string {
 	return v.StringWithoutEpoch()
 }
 
-func cisdigit(r rune) bool {
-	return r >= '0' && r <= '9'
-}
-
-func cisalpha(r rune) bool {
-	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
-}
-
-func order(r rune) int {
-	if cisdigit(r) {
-		return 0
+// Compare compares the two provided Debian versions. It returns 0 if a and b
+// are equal, a value < 0 if a is smaller than b and a value > 0 if a is
+// greater than b.
+func (a Version) Compare(b Version) int {
+	if a.Epoch > b.Epoch {
+		return 1
 	}
-	if cisalpha(r) {
-		return int(r)
-	}
-	if r == '~' {
+	if a.Epoch < b.Epoch {
 		return -1
 	}
-	if int(r) != 0 {
-		return int(r) + 256
+
+	rc := verrevcmp(a.Version, b.Version)
+	if rc != 0 {
+		return rc
 	}
-	return 0
+
+	return verrevcmp(a.Revision, b.Revision)
+}
+
+// Parse returns a Version struct filled with the epoch, version and revision
+// specified in input. It verifies the version string as a whole, just like
+// dpkg(1), and even returns roughly the same error messages.
+func Parse(input string) (Version, error) {
+	result := Version{}
+	return result, parseInto(&result, input)
+}
+
+// MustParse is like Parse, but panics on error.
+func MustParse(input string) Version {
+	result, err := Parse(input)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func parseInto(result *Version, input string) error {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return errors.New("version string is empty")
+	}
+
+	if strings.IndexFunc(trimmed, unicode.IsSpace) != -1 {
+		return errors.New("version string has embedded spaces")
+	}
+
+	colon := strings.Index(trimmed, ":")
+	if colon != -1 {
+		epoch, err := strconv.ParseInt(trimmed[:colon], 10, 64)
+		if err != nil {
+			return fmt.Errorf("epoch: %v", err)
+		}
+		if epoch < 0 {
+			return errors.New("epoch in version is negative")
+		}
+		result.Epoch = uint(epoch)
+	}
+
+	result.Version = trimmed[colon+1:]
+	if len(result.Version) == 0 {
+		return errors.New("nothing after colon in version number")
+	}
+	if hyphen := strings.LastIndex(result.Version, "-"); hyphen != -1 {
+		result.Revision = result.Version[hyphen+1:]
+		result.Version = result.Version[:hyphen]
+	}
+
+	if len(result.Version) > 0 && !unicode.IsDigit(rune(result.Version[0])) {
+		return errors.New("version number does not start with digit")
+	}
+
+	if strings.IndexFunc(result.Version, func(c rune) bool {
+		return !cisdigit(c) && !cisalpha(c) && c != '.' && c != '-' && c != '+' && c != '~' && c != ':'
+	}) != -1 {
+		return errors.New("invalid character in version number")
+	}
+
+	if strings.IndexFunc(result.Revision, func(c rune) bool {
+		return !cisdigit(c) && !cisalpha(c) && c != '.' && c != '+' && c != '~'
+	}) != -1 {
+		return errors.New("invalid character in revision number")
+	}
+
+	return nil
 }
 
 func verrevcmp(a string, b string) int {
@@ -166,88 +228,26 @@ func verrevcmp(a string, b string) int {
 	return 0
 }
 
-// Compare compares the two provided Debian versions. It returns 0 if a and b
-// are equal, a value < 0 if a is smaller than b and a value > 0 if a is
-// greater than b.
-func Compare(a Version, b Version) int {
-	if a.Epoch > b.Epoch {
-		return 1
+func cisdigit(r rune) bool {
+	return r >= '0' && r <= '9'
+}
+
+func cisalpha(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+}
+
+func order(r rune) int {
+	if cisdigit(r) {
+		return 0
 	}
-	if a.Epoch < b.Epoch {
+	if cisalpha(r) {
+		return int(r)
+	}
+	if r == '~' {
 		return -1
 	}
-
-	rc := verrevcmp(a.Version, b.Version)
-	if rc != 0 {
-		return rc
+	if int(r) != 0 {
+		return int(r) + 256
 	}
-
-	return verrevcmp(a.Revision, b.Revision)
-}
-
-// Parse returns a Version struct filled with the epoch, version and revision
-// specified in input. It verifies the version string as a whole, just like
-// dpkg(1), and even returns roughly the same error messages.
-func Parse(input string) (Version, error) {
-	result := Version{}
-	return result, parseInto(&result, input)
-}
-
-// MustParse is like Parse, but panics on error.
-func MustParse(input string) Version {
-	ret, err := Parse(input)
-	if err != nil {
-		panic(err)
-	}
-	return ret
-}
-
-func parseInto(result *Version, input string) error {
-	trimmed := strings.TrimSpace(input)
-	if trimmed == "" {
-		return errors.New("version string is empty")
-	}
-
-	if strings.IndexFunc(trimmed, unicode.IsSpace) != -1 {
-		return errors.New("version string has embedded spaces")
-	}
-
-	colon := strings.Index(trimmed, ":")
-	if colon != -1 {
-		epoch, err := strconv.ParseInt(trimmed[:colon], 10, 64)
-		if err != nil {
-			return fmt.Errorf("epoch: %v", err)
-		}
-		if epoch < 0 {
-			return errors.New("epoch in version is negative")
-		}
-		result.Epoch = uint(epoch)
-	}
-
-	result.Version = trimmed[colon+1:]
-	if len(result.Version) == 0 {
-		return errors.New("nothing after colon in version number")
-	}
-	if hyphen := strings.LastIndex(result.Version, "-"); hyphen != -1 {
-		result.Revision = result.Version[hyphen+1:]
-		result.Version = result.Version[:hyphen]
-	}
-
-	if len(result.Version) > 0 && !unicode.IsDigit(rune(result.Version[0])) {
-		return errors.New("version number does not start with digit")
-	}
-
-	if strings.IndexFunc(result.Version, func(c rune) bool {
-		return !cisdigit(c) && !cisalpha(c) && c != '.' && c != '-' && c != '+' && c != '~' && c != ':'
-	}) != -1 {
-		return errors.New("invalid character in version number")
-	}
-
-	if strings.IndexFunc(result.Revision, func(c rune) bool {
-		return !cisdigit(c) && !cisalpha(c) && c != '.' && c != '+' && c != '~'
-	}) != -1 {
-		return errors.New("invalid character in revision number")
-	}
-
-	return nil
+	return 0
 }

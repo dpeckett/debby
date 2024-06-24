@@ -43,22 +43,18 @@ import (
 
 // Parse a string into a Dependency object. The input should look something
 // like "foo, bar | baz".
-func Parse(in string) (*Dependency, error) {
-	var dep Dependency
-	err := parseDependency(in, &dep)
-	if err != nil {
-		return nil, err
-	}
-	return &dep, nil
+func Parse(in string) (Dependency, error) {
+	var result Dependency
+	return result, parseDependency(in, &result)
 }
 
 // MustParse is a helper function to wrap Parse and panic on error.
 func MustParse(in string) Dependency {
-	dep, err := Parse(in)
+	result, err := Parse(in)
 	if err != nil {
 		panic(err)
 	}
-	return *dep
+	return result
 }
 
 func peekRune(reader *bufio.Reader) (rune, error) {
@@ -259,11 +255,11 @@ func parseMultiarch(reader *bufio.Reader, possi *Possibility) error {
 	}
 
 PARSE_MULTIARCH_DONE:
-	var err error
-	possi.Arch, err = arch.Parse(name)
+	archObj, err := arch.Parse(name)
 	if err != nil {
 		return err
 	}
+	possi.Arch = &archObj
 	return nil
 }
 
@@ -414,7 +410,7 @@ func parsePossibilityArchs(reader *bufio.Reader, possi *Possibility) error {
 
 func parsePossibilityArch(reader *bufio.Reader, possi *Possibility) error {
 	eatWhitespace(reader)
-	archStr := ""
+	name := ""
 
 	peek, err := peekRune(reader)
 	if err != nil {
@@ -443,15 +439,15 @@ func parsePossibilityArch(reader *bufio.Reader, possi *Possibility) error {
 		case '!':
 			return errors.New("you can only negate whole blocks")
 		case ']', ' ': /* Let our parent deal with both of these */
-			archObj, err := arch.Parse(archStr)
+			archObj, err := arch.Parse(name)
 			if err != nil {
 				return err
 			}
-			possi.Architectures.Architectures = append(possi.Architectures.Architectures, *archObj)
+			possi.Architectures.Architectures = append(possi.Architectures.Architectures, archObj)
 			return nil
 		}
 		next, _, _ := reader.ReadRune()
-		archStr += string(next)
+		name += string(next)
 	}
 }
 
