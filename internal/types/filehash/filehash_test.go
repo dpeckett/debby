@@ -14,10 +14,12 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dpeckett/debby/internal/deb822"
 	"github.com/dpeckett/debby/internal/keyring"
+	"github.com/dpeckett/debby/internal/testutil"
 	"github.com/dpeckett/debby/internal/types/filehash"
 	"github.com/dpeckett/debby/internal/types/list"
 	"github.com/neilotoole/slogt"
@@ -27,14 +29,14 @@ import (
 func TestFileHash(t *testing.T) {
 	slog.SetDefault(slogt.New(t))
 
-	f, err := os.Open("../../../testdata/InRelease")
+	f, err := os.Open(filepath.Join(testutil.Root(), "testdata/InRelease"))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, f.Close())
 	})
 
 	ctx := context.Background()
-	keyring, err := keyring.Load(ctx, http.DefaultClient, "../../../testdata/archive-key-12.asc")
+	keyring, err := keyring.Load(ctx, http.DefaultClient, filepath.Join(testutil.Root(), "testdata/archive-key-12.asc"))
 	require.NoError(t, err)
 
 	decoder, err := deb822.NewDecoder(f, keyring)

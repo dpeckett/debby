@@ -14,10 +14,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dpeckett/debby/internal/deb822"
 	"github.com/dpeckett/debby/internal/packages"
+	"github.com/dpeckett/debby/internal/testutil"
 	"github.com/dpeckett/debby/internal/types"
 	"github.com/neilotoole/slogt"
 	"github.com/stretchr/testify/require"
@@ -26,7 +28,7 @@ import (
 func TestResolver(t *testing.T) {
 	slog.SetDefault(slogt.New(t))
 
-	f, err := os.Open("../../testdata/Packages.gz")
+	f, err := os.Open(filepath.Join(testutil.Root(), "testdata/Packages.gz"))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, f.Close())

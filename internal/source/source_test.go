@@ -15,10 +15,12 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"path/filepath"
 	"testing"
 
 	latestconfig "github.com/dpeckett/debby/internal/config/v1alpha1"
 	"github.com/dpeckett/debby/internal/source"
+	"github.com/dpeckett/debby/internal/testutil"
 	"github.com/dpeckett/debby/internal/types/arch"
 	"github.com/neilotoole/slogt"
 	"github.com/stretchr/testify/require"
@@ -42,7 +44,7 @@ func TestSource(t *testing.T) {
 
 	s, err := source.NewSource(ctx, http.DefaultClient, latestconfig.SourceConfig{
 		URL:      fmt.Sprintf("http://%s/debian", mirrorResult.addr.String()),
-		SignedBy: "../../testdata/archive-key-12.asc",
+		SignedBy: filepath.Join(testutil.Root(), "testdata/archive-key-12.asc"),
 	})
 	require.NoError(t, err)
 
@@ -69,12 +71,14 @@ type runMirrorResult struct {
 func runDebianMirror(ctx context.Context, result chan runMirrorResult) {
 	mux := http.NewServeMux()
 
+	rootDir := filepath.Join(testutil.Root(), "testdata")
+
 	mux.HandleFunc("/debian/dists/stable/InRelease", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "../../testdata/InRelease")
+		http.ServeFile(w, r, filepath.Join(rootDir, "InRelease"))
 	})
 
 	mux.HandleFunc("/debian/dists/stable/main/binary-amd64/Packages.gz", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "../../testdata/Packages.gz")
+		http.ServeFile(w, r, filepath.Join(rootDir, "Packages.gz"))
 	})
 
 	srv := &http.Server{

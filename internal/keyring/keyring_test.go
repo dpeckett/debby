@@ -13,9 +13,11 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"testing"
 
 	"github.com/dpeckett/debby/internal/keyring"
+	"github.com/dpeckett/debby/internal/testutil"
 	"github.com/neilotoole/slogt"
 	"github.com/stretchr/testify/require"
 )
@@ -32,7 +34,7 @@ func TestKeyringRead(t *testing.T) {
 	})
 
 	t.Run("File", func(t *testing.T) {
-		keyring, err := keyring.Load(ctx, http.DefaultClient, "../../testdata/archive-key-12.asc")
+		keyring, err := keyring.Load(ctx, http.DefaultClient, filepath.Join(testutil.Root(), "testdata/archive-key-12.asc"))
 		require.NoError(t, err)
 
 		require.NotEmpty(t, keyring)
