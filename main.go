@@ -29,8 +29,8 @@ import (
 	latestconfig "github.com/dpeckett/debby/internal/config/v1alpha1"
 	"github.com/dpeckett/debby/internal/packages"
 	"github.com/dpeckett/debby/internal/source"
+	"github.com/dpeckett/debby/internal/types"
 	"github.com/dpeckett/debby/internal/types/arch"
-	"github.com/dpeckett/debby/internal/types/version"
 	"github.com/dpeckett/debby/internal/util"
 	"github.com/gregjones/httpcache"
 	"github.com/urfave/cli/v2"
@@ -114,17 +114,26 @@ func main() {
 
 			logger.Info("Loading packages")
 
-			packageCollection, err := loadPackages(c.Context, logger, httpClient, conf, targetArch)
+			packageDB, err := loadPackages(c.Context, logger, httpClient, conf, targetArch)
 			if err != nil {
 				return err
 			}
 
-			bash, ok := packageCollection.ExactlyEqual("bash", version.MustParse("5.2.15-2+b2"))
-			if !ok {
-				return errors.New("bash not found")
+			res := packages.NewResolver(logger, packageDB)
+
+			selectedDB, err := res.Resolve(conf.Contents.Packages)
+			if err != nil {
+				return err
 			}
 
-			fmt.Printf("Bash results: %+v\n", bash)
+			logger.Info("Selected", slog.Int("count", selectedDB.Len()))
+
+			selectedDB.ForEach(func(pkg types.Package) error {
+				if !pkg.IsVirtual {
+					fmt.Println(pkg.Package, pkg.Version)
+				}
+				return nil
+			})
 
 			return nil
 		},
@@ -136,9 +145,14 @@ func main() {
 	}
 }
 
-func loadPackages(ctx context.Context, logger *slog.Logger, httpClient *http.Client, conf *latestconfig.Config, targetArch arch.Arch) (*packages.PackageCollection, error) {
-	p := mpb.NewWithContext(ctx)
-	defer p.Shutdown()
+func loadPackages(ctx context.Context, logger *slog.Logger, httpClient *http.Client, conf *latestconfig.Config, targetArch arch.Arch) (*packages.PackageDB, error) {
+	var p *mpb.Progress
+
+	// Is the logger debug level?
+	if !logger.Enabled(ctx, slog.LevelDebug) {
+		p = mpb.NewWithContext(ctx)
+		defer p.Shutdown()
+	}
 
 	var componentsMu sync.Mutex
 	var components []source.Component
@@ -146,28 +160,30 @@ func loadPackages(ctx context.Context, logger *slog.Logger, httpClient *http.Cli
 	{
 		g, ctx := errgroup.WithContext(ctx)
 
-		bar := p.AddBar(int64(len(conf.Contents.Sources)),
-			mpb.PrependDecorators(
-				decor.Name("Source: "),
-				decor.CountersNoUnit("%d / %d"),
-			),
-			mpb.AppendDecorators(
-				decor.Percentage(),
-			),
-		)
+		var bar *mpb.Bar
+		if p != nil {
+			bar = p.AddBar(int64(len(conf.Contents.Sources)),
+				mpb.PrependDecorators(
+					decor.Name("Source: "),
+					decor.CountersNoUnit("%d / %d"),
+				),
+				mpb.AppendDecorators(
+					decor.Percentage(),
+				),
+			)
+		}
 
 		for _, sourceConf := range conf.Contents.Sources {
 			sourceConf := sourceConf
 
 			g.Go(func() error {
-				defer bar.Increment()
+				defer func() {
+					if bar != nil {
+						bar.Increment()
+					}
+				}()
 
-				keyring, err := loadKeyring(logger, httpClient, sourceConf.SignedBy)
-				if err != nil {
-					return fmt.Errorf("failed to load keyring for source: %w", err)
-				}
-
-				s, err := source.NewSource(logger, httpClient, keyring, sourceConf)
+				s, err := source.NewSource(ctx, logger, httpClient, sourceConf)
 				if err != nil {
 					return fmt.Errorf("failed to create source: %w", err)
 				}
@@ -186,52 +202,67 @@ func loadPackages(ctx context.Context, logger *slog.Logger, httpClient *http.Cli
 		}
 
 		err := g.Wait()
-		bar.SetTotal(bar.Current(), true)
+
+		if bar != nil {
+			bar.SetTotal(bar.Current(), true)
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to get components: %w", err)
 		}
 	}
 
-	packageCollection := packages.NewPackageCollection()
+	packageDB := packages.NewPackageDB()
 
 	{
 		g, ctx := errgroup.WithContext(ctx)
 
-		bar := p.AddBar(int64(len(components)),
-			mpb.PrependDecorators(
-				decor.Name("Component: "),
-				decor.CountersNoUnit("%d / %d"),
-			),
-			mpb.AppendDecorators(
-				decor.Percentage(),
-			),
-		)
+		var bar *mpb.Bar
+		if p != nil {
+			bar = p.AddBar(int64(len(components)),
+				mpb.PrependDecorators(
+					decor.Name("Component: "),
+					decor.CountersNoUnit("%d / %d"),
+				),
+				mpb.AppendDecorators(
+					decor.Percentage(),
+				),
+			)
+		}
 
 		for _, component := range components {
 			component := component
 
 			g.Go(func() error {
-				defer bar.Increment()
+				defer func() {
+					if bar != nil {
+						bar.Increment()
+					}
+				}()
 
 				componentPackages, err := component.Packages(ctx)
 				if err != nil {
 					return fmt.Errorf("failed to get packages: %w", err)
 				}
 
-				packageCollection.AddAll(componentPackages)
+				packageDB.AddAll(componentPackages)
 
 				return nil
 			})
 		}
 
 		err := g.Wait()
-		bar.SetTotal(bar.Current(), true)
+
+		if bar != nil {
+			bar.SetTotal(bar.Current(), true)
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to get packages: %w", err)
 		}
 	}
 
-	return packageCollection, nil
+	return packageDB, nil
 }
 
 func loadKeyring(logger *slog.Logger, httpClient *http.Client, key string) (openpgp.EntityList, error) {

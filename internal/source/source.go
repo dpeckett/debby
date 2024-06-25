@@ -1,3 +1,12 @@
+// SPDX-License-Identifier: MPL-2.0
+/*
+ * Copyright (C) 2024 Damian Peckett <damian@pecke.tt>.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 package source
 
 import (
@@ -8,10 +17,12 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	latestconfig "github.com/dpeckett/debby/internal/config/v1alpha1"
 	"github.com/dpeckett/debby/internal/deb822"
+	"github.com/dpeckett/debby/internal/keyring"
 	"github.com/dpeckett/debby/internal/types"
 	"github.com/dpeckett/debby/internal/types/arch"
 )
@@ -33,7 +44,7 @@ type Source struct {
 }
 
 // NewSource creates a new Debian repository source.
-func NewSource(logger *slog.Logger, httpClient *http.Client, keyring openpgp.EntityList, conf latestconfig.SourceConfig) (*Source, error) {
+func NewSource(ctx context.Context, logger *slog.Logger, httpClient *http.Client, conf latestconfig.SourceConfig) (*Source, error) {
 	distribution := defaultDistribution
 	if conf.Distribution != "" {
 		distribution = conf.Distribution
@@ -47,6 +58,11 @@ func NewSource(logger *slog.Logger, httpClient *http.Client, keyring openpgp.Ent
 	sourceURL, err := url.Parse(conf.URL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse source URL: %w", err)
+	}
+
+	keyring, err := keyring.Load(ctx, logger, httpClient, conf.SignedBy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read keyring: %w", err)
 	}
 
 	return &Source{
@@ -141,26 +157,31 @@ func (s *Source) Components(ctx context.Context, targetArch arch.Arch) ([]Compon
 	var components []Component
 	for _, component := range availableComponents {
 		for _, arch := range availableArchitectures {
-			packagesURL, err := url.Parse(s.sourceURL.String())
+			componentURL, err := url.Parse(s.sourceURL.String())
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse source URL: %w", err)
 			}
 
-			packagesURL.Path = path.Join(packagesURL.Path, "dists", s.distribution, component, "binary-"+arch.String(), "Packages.xz")
+			componentURL.Path = path.Join(componentURL.Path, "dists", s.distribution, component, "binary-"+arch.String())
 
-			relativePackagesPath := path.Join(path.Base(component), "binary-"+arch.String(), "Packages.xz")
-			expectedSHA256Sum, ok := releaseSHA256Sums[relativePackagesPath]
-			if !ok {
-				return nil, fmt.Errorf("no SHA256 sum for Packages file: %s", relativePackagesPath)
+			componentDir := path.Join(path.Base(component), "binary-"+arch.String())
+
+			componentSHA256Sums := make(map[string][]byte)
+			for filename, sum := range releaseSHA256Sums {
+				if strings.HasPrefix(filename, componentDir) {
+					componentSHA256Sums[strings.TrimPrefix(filename, componentDir+"/")] = sum
+				}
 			}
 
 			components = append(components, Component{
-				Name:              component,
-				PackagesURL:       packagesURL,
-				PackagesSHA256Sum: expectedSHA256Sum,
-				httpClient:        s.httpClient,
-				keyring:           s.keyring,
-				sourceURL:         s.sourceURL,
+				Name:       component,
+				Arch:       arch,
+				URL:        componentURL,
+				SHA256Sums: componentSHA256Sums,
+				logger:     s.logger,
+				httpClient: s.httpClient,
+				keyring:    s.keyring,
+				sourceURL:  s.sourceURL,
 			})
 		}
 	}

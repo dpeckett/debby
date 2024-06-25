@@ -63,8 +63,8 @@ func TestArchCompareBasics(t *testing.T) {
 		other, err := arch.Parse(el)
 		require.NoError(t, err)
 
-		require.True(t, a.Is(other))
-		require.True(t, other.Is(a))
+		require.True(t, a.Is(&other))
+		require.True(t, other.Is(&a))
 	}
 
 	unequivs := []string{
@@ -80,8 +80,8 @@ func TestArchCompareBasics(t *testing.T) {
 		other, err := arch.Parse(el)
 		require.NoError(t, err)
 
-		require.False(t, a.Is(other))
-		require.False(t, other.Is(a))
+		require.False(t, a.Is(&other))
+		require.False(t, other.Is(&a))
 	}
 }
 
@@ -92,6 +92,6 @@ func TestArchCompareAllAny(t *testing.T) {
 	wildcard, err := arch.Parse("any")
 	require.NoError(t, err)
 
-	require.False(t, all.Is(wildcard))
-	require.False(t, wildcard.Is(all))
+	require.False(t, all.Is(&wildcard))
+	require.False(t, wildcard.Is(&all))
 }

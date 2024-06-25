@@ -10,6 +10,8 @@
 package types_test
 
 import (
+	"compress/gzip"
+	"io"
 	"os"
 	"testing"
 
@@ -22,19 +24,22 @@ import (
 )
 
 func TestPackage(t *testing.T) {
-	f, err := os.Open("testdata/Packages")
+	f, err := os.Open("../../testdata/Packages.gz")
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, f.Close())
 	})
 
-	decoder, err := deb822.NewDecoder(f, nil)
+	gzReader, err := gzip.NewReader(f)
 	require.NoError(t, err)
 
-	var packages []types.Package
-	require.NoError(t, decoder.Decode(&packages))
+	decoder, err := deb822.NewDecoder(io.LimitReader(gzReader, 1000000), nil)
+	require.NoError(t, err)
 
-	require.Len(t, packages, 527)
+	var packageList []types.Package
+	require.NoError(t, decoder.Decode(&packageList))
+
+	require.Len(t, packageList, 1324)
 
 	expected := types.Package{
 		Package:       "0ad",
@@ -54,5 +59,5 @@ func TestPackage(t *testing.T) {
 		SHA256:        "3a2118df47bf3f04285649f0455c2fc6fe2dc7f0b237073038aa00af41f0d5f2",
 	}
 
-	require.Equal(t, expected, packages[0])
+	require.Equal(t, expected, packageList[0])
 }

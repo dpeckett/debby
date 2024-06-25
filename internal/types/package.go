@@ -71,7 +71,11 @@ type Package struct {
 	// used internally by debby.
 
 	// URLs is a list of URLs that the package can be downloaded from.
-	URLs []string `json:"X-URLs"`
+	URLs []string `json:"-"`
+	// IsVirtual is true if the package is a virtual package.
+	IsVirtual bool `json:"-"`
+	// Providers lists packages that provide this virtual package.
+	Providers []Package `json:"-"`
 }
 
 // ID returns a unique identifier for the package.

@@ -13,4 +13,4 @@ contents:
       components:
         - updates/main
   packages:
-    - libc6
+    - bash

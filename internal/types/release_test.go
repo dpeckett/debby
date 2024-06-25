@@ -10,22 +10,32 @@
 package types_test
 
 import (
+	"context"
+	"net/http"
 	"os"
 	"testing"
 
 	"github.com/dpeckett/debby/internal/deb822"
+	"github.com/dpeckett/debby/internal/keyring"
 	"github.com/dpeckett/debby/internal/types"
+	"github.com/neilotoole/slogt"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRelease(t *testing.T) {
-	f, err := os.Open("testdata/Release")
+	f, err := os.Open("../../testdata/InRelease")
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, f.Close())
 	})
 
-	decoder, err := deb822.NewDecoder(f, nil)
+	ctx := context.Background()
+	logger := slogt.New(t)
+
+	keyring, err := keyring.Load(ctx, logger, http.DefaultClient, "../../testdata/archive-key-12.asc")
+	require.NoError(t, err)
+
+	decoder, err := deb822.NewDecoder(f, keyring)
 	require.NoError(t, err)
 
 	var release types.Release
