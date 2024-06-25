@@ -21,14 +21,12 @@ import (
 
 // Resolver resolves package dependencies.
 type Resolver struct {
-	logger    *slog.Logger
 	packageDB *PackageDB
 }
 
 // NewResolver creates a new resolver.
-func NewResolver(logger *slog.Logger, packageDB *PackageDB) *Resolver {
+func NewResolver(packageDB *PackageDB) *Resolver {
 	return &Resolver{
-		logger:    logger,
 		packageDB: packageDB,
 	}
 }
@@ -71,9 +69,9 @@ func (r *Resolver) Resolve(packageNameVersions []string) (*PackageDB, error) {
 		}
 	}
 
-	r.logger.Debug("Found initial candidates", slog.Int("count", candidateDB.Len()))
+	slog.Debug("Found initial candidates", slog.Int("count", candidateDB.Len()))
 
-	r.logger.Debug("Building dependency tree")
+	slog.Debug("Building dependency tree")
 
 	var queue []types.Package
 	candidateDB.ForEach(func(pkg types.Package) error {
@@ -105,7 +103,7 @@ func (r *Resolver) Resolve(packageNameVersions []string) (*PackageDB, error) {
 		}
 	}
 
-	r.logger.Debug("Pruning candidates with unsatisfiable dependencies")
+	slog.Debug("Pruning candidates with unsatisfiable dependencies")
 
 	r.pruneUnsatisfied(candidateDB)
 
@@ -113,7 +111,7 @@ func (r *Resolver) Resolve(packageNameVersions []string) (*PackageDB, error) {
 	// version.
 	// TODO: shell out to a SAT solver to find the optimal solution.
 	// TODO: handle conflicts etc.
-	r.logger.Debug("Selecting newest version of each package")
+	slog.Debug("Selecting newest version of each package")
 
 	var selectedDB = NewPackageDB()
 	_ = candidateDB.ForEach(func(pkg types.Package) error {
@@ -141,7 +139,7 @@ func (r *Resolver) Resolve(packageNameVersions []string) (*PackageDB, error) {
 
 	r.pruneUnsatisfied(selectedDB)
 
-	r.logger.Debug("Confirming requested packages are still selected")
+	slog.Debug("Confirming requested packages are still selected")
 
 	// Confirm all the requested packages are still selected.
 	for name, version := range requestedPackages {
@@ -165,7 +163,7 @@ func (r *Resolver) pruneUnsatisfied(candidateDB *PackageDB) {
 		var pruneList []types.Package
 		_ = candidateDB.ForEach(func(pkg types.Package) error {
 			if _, err := r.getDependencies(candidateDB, candidateDB, pkg); err != nil {
-				r.logger.Debug("Pruning unsatisfiable candidate",
+				slog.Debug("Pruning unsatisfiable candidate",
 					slog.String("name", pkg.Package), slog.String("version", pkg.Version.String()),
 					slog.Any("error", err))
 
@@ -227,7 +225,7 @@ func (r *Resolver) getDependencies(packageDB, candidateDB *PackageDB, pkg types.
 					if resolvedPkg, err := r.resolveVirtualPackage(packageDB, candidateDB, pkg); err == nil {
 						resolvedPackages = append(resolvedPackages, resolvedPkg)
 					} else {
-						r.logger.Debug("Failed to resolve virtual package",
+						slog.Debug("Failed to resolve virtual package",
 							slog.String("name", pkg.Package), slog.String("version", pkg.Version.String()),
 							slog.Any("error", err))
 					}

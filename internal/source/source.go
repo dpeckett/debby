@@ -35,7 +35,6 @@ var defaultComponents = []string{"main"}
 
 // Source represents a Debian repository source.
 type Source struct {
-	logger       *slog.Logger
 	httpClient   *http.Client
 	keyring      openpgp.EntityList
 	sourceURL    *url.URL
@@ -44,7 +43,7 @@ type Source struct {
 }
 
 // NewSource creates a new Debian repository source.
-func NewSource(ctx context.Context, logger *slog.Logger, httpClient *http.Client, conf latestconfig.SourceConfig) (*Source, error) {
+func NewSource(ctx context.Context, httpClient *http.Client, conf latestconfig.SourceConfig) (*Source, error) {
 	distribution := defaultDistribution
 	if conf.Distribution != "" {
 		distribution = conf.Distribution
@@ -60,15 +59,12 @@ func NewSource(ctx context.Context, logger *slog.Logger, httpClient *http.Client
 		return nil, fmt.Errorf("failed to parse source URL: %w", err)
 	}
 
-	keyring, err := keyring.Load(ctx, logger, httpClient, conf.SignedBy)
+	keyring, err := keyring.Load(ctx, httpClient, conf.SignedBy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read keyring: %w", err)
 	}
 
 	return &Source{
-		logger: logger.With(
-			slog.String("sourceURL", conf.URL),
-			slog.String("distribution", distribution)),
 		httpClient:   httpClient,
 		keyring:      keyring,
 		sourceURL:    sourceURL,
@@ -124,7 +120,7 @@ func (s *Source) Components(ctx context.Context, targetArch arch.Arch) ([]Compon
 	}
 
 	if len(availableArchitectures) == 0 {
-		s.logger.Warn("No architectures available")
+		slog.Warn("No architectures available")
 		return nil, nil
 	}
 
@@ -144,7 +140,7 @@ func (s *Source) Components(ctx context.Context, targetArch arch.Arch) ([]Compon
 	}
 
 	if len(availableComponents) == 0 {
-		s.logger.Warn("No components available")
+		slog.Warn("No components available")
 		return nil, nil
 	}
 
@@ -178,7 +174,6 @@ func (s *Source) Components(ctx context.Context, targetArch arch.Arch) ([]Compon
 				Arch:       arch,
 				URL:        componentURL,
 				SHA256Sums: componentSHA256Sums,
-				logger:     s.logger,
 				httpClient: s.httpClient,
 				keyring:    s.keyring,
 				sourceURL:  s.sourceURL,

@@ -12,6 +12,7 @@ package packages_test
 import (
 	"compress/gzip"
 	"fmt"
+	"log/slog"
 	"os"
 	"testing"
 
@@ -23,7 +24,7 @@ import (
 )
 
 func TestResolver(t *testing.T) {
-	logger := slogt.New(t)
+	slog.SetDefault(slogt.New(t))
 
 	f, err := os.Open("../../testdata/Packages.gz")
 	require.NoError(t, err)
@@ -46,7 +47,7 @@ func TestResolver(t *testing.T) {
 	packageDB := packages.NewPackageDB()
 	packageDB.AddAll(packageList)
 
-	res := packages.NewResolver(logger, packageDB)
+	res := packages.NewResolver(packageDB)
 
 	selectedDB, err := res.Resolve([]string{"bash=5.2.15-2+b2"})
 	require.NoError(t, err)

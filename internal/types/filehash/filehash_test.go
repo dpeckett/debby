@@ -11,6 +11,7 @@ package filehash_test
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"os"
 	"testing"
@@ -24,15 +25,16 @@ import (
 )
 
 func TestFileHash(t *testing.T) {
+	slog.SetDefault(slogt.New(t))
+
 	f, err := os.Open("../../../testdata/InRelease")
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, f.Close())
 	})
 
-	logger := slogt.New(t)
 	ctx := context.Background()
-	keyring, err := keyring.Load(ctx, logger, http.DefaultClient, "../../../testdata/archive-key-12.asc")
+	keyring, err := keyring.Load(ctx, http.DefaultClient, "../../../testdata/archive-key-12.asc")
 	require.NoError(t, err)
 
 	decoder, err := deb822.NewDecoder(f, keyring)

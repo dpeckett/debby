@@ -25,14 +25,14 @@ import (
 )
 
 // Load reads an OpenPGP keyring from a file or URL.
-func Load(ctx context.Context, logger *slog.Logger, httpClient *http.Client, key string) (openpgp.EntityList, error) {
+func Load(ctx context.Context, httpClient *http.Client, key string) (openpgp.EntityList, error) {
 	if len(key) == 0 {
 		return openpgp.EntityList{}, nil
 	}
 
 	// If the key is a URL, download it.
 	if strings.Contains(key, "://") {
-		logger.Debug("Downloading key", slog.String("url", key))
+		slog.Debug("Downloading key", slog.String("url", key))
 
 		keyURL, err := url.Parse(key)
 		if err != nil {
@@ -67,7 +67,7 @@ func Load(ctx context.Context, logger *slog.Logger, httpClient *http.Client, key
 
 		return openpgp.ReadArmoredKeyRing(bytes.NewReader(keyringData))
 	} else { // If the key is a file, open it.
-		logger.Debug("Reading key file", slog.String("path", key))
+		slog.Debug("Reading key file", slog.String("path", key))
 
 		f, err := os.Open(key)
 		if err != nil {

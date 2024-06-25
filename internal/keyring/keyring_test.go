@@ -11,6 +11,7 @@ package keyring_test
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"testing"
 
@@ -21,17 +22,17 @@ import (
 
 func TestKeyringRead(t *testing.T) {
 	ctx := context.Background()
-	logger := slogt.New(t)
+	slog.SetDefault(slogt.New(t))
 
 	t.Run("Web", func(t *testing.T) {
-		keyring, err := keyring.Load(ctx, logger, http.DefaultClient, "https://ftp-master.debian.org/keys/archive-key-12.asc")
+		keyring, err := keyring.Load(ctx, http.DefaultClient, "https://ftp-master.debian.org/keys/archive-key-12.asc")
 		require.NoError(t, err)
 
 		require.NotEmpty(t, keyring)
 	})
 
 	t.Run("File", func(t *testing.T) {
-		keyring, err := keyring.Load(ctx, logger, http.DefaultClient, "../../testdata/archive-key-12.asc")
+		keyring, err := keyring.Load(ctx, http.DefaultClient, "../../testdata/archive-key-12.asc")
 		require.NoError(t, err)
 
 		require.NotEmpty(t, keyring)

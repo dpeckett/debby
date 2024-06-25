@@ -36,7 +36,6 @@ type Component struct {
 	// SHA256Sums are the SHA256 sums of files in the component.
 	SHA256Sums map[string][]byte
 	// Internal fields.
-	logger     *slog.Logger
 	httpClient *http.Client
 	keyring    openpgp.EntityList
 	sourceURL  *url.URL
@@ -53,7 +52,7 @@ func (c *Component) Packages(ctx context.Context) ([]types.Package, error) {
 
 		packagesURL.Path = path.Join(packagesURL.Path, name)
 
-		c.logger.Debug("Attempting to download Packages file", slog.String("url", packagesURL.String()))
+		slog.Debug("Attempting to download Packages file", slog.String("url", packagesURL.String()))
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, packagesURL.String(), nil)
 		if err != nil {

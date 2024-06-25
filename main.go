@@ -10,20 +10,14 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"runtime"
-	"strings"
 	"sync"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/adrg/xdg"
 	"github.com/dpeckett/debby/internal/config"
 	latestconfig "github.com/dpeckett/debby/internal/config/v1alpha1"
@@ -98,7 +92,7 @@ func main() {
 				return fmt.Errorf("failed to read config: %w", err)
 			}
 
-			cache, err := util.NewDiskCache(logger, cacheDir, "http")
+			cache, err := util.NewDiskCache(cacheDir, "http")
 			if err != nil {
 				return fmt.Errorf("failed to create disk cache: %w", err)
 			}
@@ -114,12 +108,12 @@ func main() {
 
 			logger.Info("Loading packages")
 
-			packageDB, err := loadPackages(c.Context, logger, httpClient, conf, targetArch)
+			packageDB, err := loadPackages(c.Context, httpClient, conf, targetArch)
 			if err != nil {
 				return err
 			}
 
-			res := packages.NewResolver(logger, packageDB)
+			res := packages.NewResolver(packageDB)
 
 			selectedDB, err := res.Resolve(conf.Contents.Packages)
 			if err != nil {
@@ -145,11 +139,11 @@ func main() {
 	}
 }
 
-func loadPackages(ctx context.Context, logger *slog.Logger, httpClient *http.Client, conf *latestconfig.Config, targetArch arch.Arch) (*packages.PackageDB, error) {
+func loadPackages(ctx context.Context, httpClient *http.Client, conf *latestconfig.Config, targetArch arch.Arch) (*packages.PackageDB, error) {
 	var p *mpb.Progress
 
 	// Is the logger debug level?
-	if !logger.Enabled(ctx, slog.LevelDebug) {
+	if !slog.Default().Enabled(ctx, slog.LevelDebug) {
 		p = mpb.NewWithContext(ctx)
 		defer p.Shutdown()
 	}
@@ -183,7 +177,7 @@ func loadPackages(ctx context.Context, logger *slog.Logger, httpClient *http.Cli
 					}
 				}()
 
-				s, err := source.NewSource(ctx, logger, httpClient, sourceConf)
+				s, err := source.NewSource(ctx, httpClient, sourceConf)
 				if err != nil {
 					return fmt.Errorf("failed to create source: %w", err)
 				}
@@ -263,49 +257,4 @@ func loadPackages(ctx context.Context, logger *slog.Logger, httpClient *http.Cli
 	}
 
 	return packageDB, nil
-}
-
-func loadKeyring(logger *slog.Logger, httpClient *http.Client, key string) (openpgp.EntityList, error) {
-	if len(key) == 0 {
-		return openpgp.EntityList{}, nil
-	}
-
-	// If the key is a URL, download it.
-	if strings.Contains(key, "://") {
-		logger.Debug("Downloading key", slog.String("url", key))
-
-		keyURL, err := url.Parse(key)
-		if err != nil {
-			return nil, err
-		}
-
-		if keyURL.Scheme != "https" {
-			return nil, errors.New("key URL must be HTTPS")
-		}
-
-		resp, err := httpClient.Get(keyURL.String())
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
-
-		// ReadArmoredKeyRing() doesn't read the entire response body, so we need
-		// to do it ourselves (so that response caching will work as expected).
-		keyringData, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-
-		return openpgp.ReadArmoredKeyRing(bytes.NewReader(keyringData))
-	} else { // If the key is a file, open it.
-		logger.Debug("Reading key file", slog.String("path", key))
-
-		f, err := os.Open(key)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-
-		return openpgp.ReadArmoredKeyRing(f)
-	}
 }

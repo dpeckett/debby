@@ -12,6 +12,7 @@ package source_test
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"testing"
@@ -24,7 +25,7 @@ import (
 )
 
 func TestSource(t *testing.T) {
-	logger := slogt.New(t)
+	slog.SetDefault(slogt.New(t))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -39,7 +40,7 @@ func TestSource(t *testing.T) {
 	mirrorResult := <-resultCh
 	require.NoError(t, mirrorResult.err)
 
-	s, err := source.NewSource(ctx, logger, http.DefaultClient, latestconfig.SourceConfig{
+	s, err := source.NewSource(ctx, http.DefaultClient, latestconfig.SourceConfig{
 		URL:      fmt.Sprintf("http://%s/debian", mirrorResult.addr.String()),
 		SignedBy: "../../testdata/archive-key-12.asc",
 	})
